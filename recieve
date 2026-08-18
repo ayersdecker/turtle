@@ -1,13 +1,58 @@
-rednet.open("right") -- Opens the modem automatically
-print("Listening for wireless commands...")
+rednet.open("right") -- Turtle modems are always on the right
+local TARGET_Y = 48
+local currentY = 0
+
+-- Helper function to report status to base
+local function reportStatus(baseID, msg)
+    rednet.send(baseID, {status = msg, yLevel = currentY})
+end
+
+local function travelVertical(target, baseID)
+    while currentY ~= target do
+        reportStatus(baseID, "Moving Vertically...")
+        if currentY < target then
+            if turtle.up() then currentY = currentY + 1 else turtle.digUp() end
+        else
+            if turtle.down() then currentY = currentY - 1 else turtle.digDown() end
+        end
+        os.sleep(0.05)
+    end
+end
+
+local function moveForward()
+    while not turtle.forward() do turtle.dig() end
+end
+
+print("=== TURTLE NODE RUNNING ===")
+print("My ID is: " .. os.getComputerID())
+print("Waiting for Master Controller...")
 
 while true do
-    local senderID, message = rednet.receive() -- Listens for a signal
-    print("Received command: " .. tostring(message))
-
-    if message == "mine" then
-        shell.run("copmine") -- Launches your mining code
-    elseif message == "stop" then
-        break
+    local senderID, msg = rednet.receive()
+    
+    -- Check if message is a valid command table
+    if type(msg) == "table" and msg.command == "START_MINE" then
+        currentY = msg.startY
+        local distance = msg.dist
+        
+        reportStatus(senderID, "Initializing...")
+        os.sleep(1)
+        
+        -- Travel to Copper Level
+        travelVertical(TARGET_Y, senderID)
+        
+        -- Mining loop
+        for i = 1, distance do
+            reportStatus(senderID, "Mining (" .. i .. "/" .. distance .. ")")
+            moveForward()
+            turtle.digUp()
+            turtle.digDown()
+        end
+        
+        -- Return Home
+        reportStatus(senderID, "Returning Home...")
+        travelVertical(msg.startY, senderID)
+        
+        reportStatus(senderID, "FINISHED")
     end
 end
