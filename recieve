@@ -1,10 +1,11 @@
-rednet.open("right") -- Turtle modems are always on the right
+rednet.open("right") -- Turtle modems are always on the right side
 local TARGET_Y = 48
 local currentY = 0
 
--- Helper function to report status to base
+-- Function to package data into text strings and send back to base
 local function reportStatus(baseID, msg)
-    rednet.send(baseID, {status = msg, yLevel = currentY})
+    local replyPayload = {status = msg, yLevel = currentY}
+    rednet.broadcast(textutils.serialize(replyPayload))
 end
 
 local function travelVertical(target, baseID)
@@ -25,12 +26,14 @@ end
 
 print("=== TURTLE NODE RUNNING ===")
 print("My ID is: " .. os.getComputerID())
-print("Waiting for Master Controller...")
+print("Waiting for Master Controller broadcast...")
 
 while true do
-    local senderID, msg = rednet.receive()
+    local senderID, rawMsg = rednet.receive()
     
-    -- Check if message is a valid command table
+    -- Safety check: Unserialize the incoming text back into a table
+    local msg = textutils.unserialize(rawMsg)
+    
     if type(msg) == "table" and msg.command == "START_MINE" then
         currentY = msg.startY
         local distance = msg.dist
@@ -38,10 +41,10 @@ while true do
         reportStatus(senderID, "Initializing...")
         os.sleep(1)
         
-        -- Travel to Copper Level
+        -- Travel to optimal copper layer
         travelVertical(TARGET_Y, senderID)
         
-        -- Mining loop
+        -- Straight line mining loop
         for i = 1, distance do
             reportStatus(senderID, "Mining (" .. i .. "/" .. distance .. ")")
             moveForward()
@@ -49,7 +52,7 @@ while true do
             turtle.digDown()
         end
         
-        -- Return Home
+        -- Return to the player's original starting height
         reportStatus(senderID, "Returning Home...")
         travelVertical(msg.startY, senderID)
         
