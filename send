@@ -1,2 +1,60 @@
-rednet.open("back")
-rednet.send(0, "mine")
+-- CONFIGURATION
+local MODEM_SIDE = "back" -- Change this to "left", "right", "back", etc.
+
+rednet.open(MODEM_SIDE)
+
+term.clear()
+term.setCursorPos(1,1)
+print("=== CC MASTER CONTROLLER ===")
+print("----------------------------")
+
+-- User Inputs
+write("Enter Turtle's ID Number: ")
+local turtleID = tonumber(read())
+
+write("Enter Turtle's Current Y-Level: ")
+local startY = tonumber(read())
+
+write("Enter Blocks Forward to Mine: ")
+local distance = tonumber(read()) or 20
+
+if not turtleID or not startY then
+    print("\nError: Invalid ID or Y-Level.")
+    return
+end
+
+-- Package data and transmit
+local payload = {
+    command = "START_MINE",
+    startY = startY,
+    dist = distance
+}
+
+print("\nPinging Turtle " .. turtleID .. "...")
+rednet.send(turtleID, payload)
+
+-- Dynamic Status Dashboard
+term.clear()
+while true do
+    local senderID, reply = rednet.receive(5) -- 5-second timeout check
+    
+    if not senderID then
+        term.setCursorPos(1,5)
+        print("Status: [CONNECTION LOST/IDLE]")
+    elseif senderID == turtleID and type(reply) == "table" then
+        term.clear()
+        term.setCursorPos(1,1)
+        print("=== LIVE TURTLE TRACKING ===")
+        print("----------------------------")
+        print("Connected to Turtle ID : " .. turtleID)
+        print("Current Turtle Altitude: Y = " .. (reply.yLevel or "Unknown"))
+        print("Current Operation      : " .. (reply.status or "Waiting"))
+        print("----------------------------")
+        
+        if reply.status == "FINISHED" then
+            print("\nOperation completed successfully!")
+            break
+        end
+    end
+    os.sleep(0.2)
+end
