@@ -1,5 +1,5 @@
 -- CONFIGURATION
-local MODEM_SIDE = "back" -- Change this to "left", "right", "back", etc.
+local MODEM_SIDE = "back" -- Change to "left", "right", "back", "bottom" if needed
 
 rednet.open(MODEM_SIDE)
 
@@ -8,7 +8,6 @@ term.setCursorPos(1,1)
 print("=== CC MASTER CONTROLLER ===")
 print("----------------------------")
 
--- User Inputs
 write("Enter Turtle's ID Number: ")
 local turtleID = tonumber(read())
 
@@ -23,25 +22,28 @@ if not turtleID or not startY then
     return
 end
 
--- Package data and transmit
+-- Package data
 local payload = {
     command = "START_MINE",
     startY = startY,
     dist = distance
 }
 
-print("\nPinging Turtle " .. turtleID .. "...")
-rednet.send(turtleID, payload)
+print("\nBroadcasting signal to airwaves...")
+-- Converts the table to a string and broadcasts it to reach the turtle
+rednet.broadcast(textutils.serialize(payload))
 
 -- Dynamic Status Dashboard
 term.clear()
 while true do
-    local senderID, reply = rednet.receive(5) -- 5-second timeout check
+    -- Listens for incoming status broadcast packages
+    local senderID, rawReply = rednet.receive(5) 
+    local reply = textutils.unserialize(rawReply)
     
     if not senderID then
         term.setCursorPos(1,5)
-        print("Status: [CONNECTION LOST/IDLE]")
-    elseif senderID == turtleID and type(reply) == "table" then
+        print("Status: [CONNECTION TIMEOUT / IDLE]")
+    elseif type(reply) == "table" then
         term.clear()
         term.setCursorPos(1,1)
         print("=== LIVE TURTLE TRACKING ===")
