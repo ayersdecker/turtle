@@ -10,7 +10,6 @@ local FUEL_RESERVE = 48        -- extra fuel kept on top of the trip home
 local MAX_VEIN     = 64        -- max blocks followed in one copper vein
 local DIG_RETRIES  = 8         -- give up instead of looping on bedrock
 local REPORT_RATE  = 0.4       -- seconds between telemetry packets
-local LINK_TIMEOUT = 15        -- seconds without controller contact -> come home
 
 ----------------------------- ITEM TABLES -----------------------------
 local COPPER = {
@@ -73,8 +72,6 @@ local curRow      = 0
 local totalRows   = 0
 local abortFlag   = false
 local recallFlag  = false
-local linkLost    = false
-local lastContact = 0
 local lastReport  = 0
 
 local DELTA = {
@@ -143,27 +140,17 @@ local function report(newStatus, newDetail, force)
     }, PROTOCOL)
 end
 
+-- Telemetry/commands are best-effort; walking out of modem range never
+-- stops the job, so the turtle keeps mining fully unattended.
 local function pollCommands()
     local _, msg = rednet.receive(PROTOCOL, 0)
     if type(msg) == "table" then
-        lastContact = os.clock()
         if msg.command == "ABORT" then
             abortFlag = true
         elseif msg.command == "RECALL" then
             recallFlag = true
         end
     end
-end
-
--- The controller heartbeats every second; silence means we have walked
--- out of modem range, so head home before we lose the turtle entirely.
-local function linkDown()
-    if linkLost then return true end
-    if (os.clock() - lastContact) > LINK_TIMEOUT then
-        linkLost = true
-        return true
-    end
-    return false
 end
 
 ------------------------------ REFUELLING -----------------------------
@@ -467,10 +454,6 @@ local function shouldStop()
         report("RECALLED", "operator recall", true)
         return true
     end
-    if linkDown() then
-        report("LINK LOST", "no controller, returning", true)
-        return true
-    end
     -- Fuel guard: this is what used to strand the turtle mid-tunnel.
     if not fuelOK(4) then
         report("LOW FUEL", "returning early", true)
@@ -567,8 +550,7 @@ print("Waiting for controller...")
 while true do
     local _, msg = rednet.receive(PROTOCOL)
     if type(msg) == "table" and msg.command == "START_MINE" then
-        abortFlag, recallFlag, linkLost = false, false, false
-        lastContact = os.clock()
+        abortFlag, recallFlag = false, false
         copperMined, otherMined, blocksMoved = 0, 0, 0
 
         if not locate() then
@@ -595,7 +577,6 @@ while true do
         unload()
         report("FINISHED", copperMined .. " copper recovered", true)
     elseif type(msg) == "table" and msg.command == "PING" then
-        lastContact = os.clock()
         report(nil, nil, true)
     end
 end
