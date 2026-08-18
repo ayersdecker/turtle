@@ -1,0 +1,13 @@
+rednet.open("right") -- Opens the modem automatically
+print("Listening for wireless commands...")
+
+while true do
+    local senderID, message = rednet.receive() -- Listens for a signal
+    print("Received command: " .. tostring(message))
+
+    if message == "mine" then
+        shell.run("copmine") -- Launches your mining code
+    elseif message == "stop" then
+        break
+    end
+end
