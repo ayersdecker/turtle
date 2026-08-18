@@ -43,9 +43,11 @@ local function field(y, label, value, fg)
     put(y, string.format(" %-8s %s", label, tostring(value)), fg)
 end
 
--- width includes the surrounding brackets
+-- width includes the surrounding brackets; clamped so it can never
+-- draw past the right edge of a narrow (pocket computer) screen.
 local function bar(x, y, width, frac, fg)
-    frac = math.max(0, math.min(1, frac or 0))
+    frac  = math.max(0, math.min(1, frac or 0))
+    width = math.max(2, math.min(width, W - x + 1))
     local inner  = width - 2
     local filled = math.floor(inner * frac + 0.5)
     term.setCursorPos(x, y)
@@ -129,6 +131,7 @@ local function statusColour(s)
 end
 
 local function draw()
+    W, H = term.getSize()  -- pocket computer / tablet screens can change size
     local live   = (os.clock() - lastSeen) < TIMEOUT
     local spin   = SPIN[(frame % #SPIN) + 1]
     local header = " COPPER MINER  #" .. turtleID
@@ -142,9 +145,12 @@ local function draw()
     field(5, "HOME", string.format("%d, %d, %d  (%d away)",
         t.home.x, t.home.y, t.home.z, t.distHome or 0), colours.cyan)
 
+    -- barW shrinks to whatever room is left after the label and text
+    -- columns, so textX never lands inside the bar on narrow (pocket
+    -- computer / tablet) screens.
     local barX  = 10
-    local barW  = math.max(8, math.min(18, W - barX - 12))
-    local textX = math.min(barX + barW + 1, W - 9)
+    local barW  = math.max(4, math.min(18, W - barX - 10))
+    local textX = barX + barW + 1
 
     -- Fuel gauge
     local fuelFrac, fuelText
