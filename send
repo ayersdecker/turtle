@@ -1,0 +1,2 @@
+rednet.open("back")
+rednet.send(0, "mine")
