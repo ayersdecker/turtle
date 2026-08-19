@@ -85,9 +85,8 @@ end
 
 local startY  = tonumber(ask(" Turtle Y level     : ", "64")) or 64
 local targetY = tonumber(ask(" Mining Y level [48]: ", "48")) or 48
-local dist    = tonumber(ask(" Row length [20]    : ", "20")) or 20
-local rows    = tonumber(ask(" Number of rows [1] : ", "1")) or 1
-local spacing = tonumber(ask(" Row spacing [3]    : ", "3")) or 3
+local length  = tonumber(ask(" Room length [20]   : ", "20")) or 20
+local width   = tonumber(ask(" Room width [5]     : ", "5")) or 5
 
 local FACING = { north = 0, east = 1, south = 2, west = 3 }
 local facingName = string.lower(ask(" Facing [north]     : ", "north"))
@@ -97,9 +96,8 @@ rednet.send(turtleID, {
     command = "START_MINE",
     startY  = startY,
     targetY = targetY,
-    dist    = dist,
-    rows    = rows,
-    spacing = spacing,
+    length  = length,
+    width   = width,
     facing  = facing,
 }, PROTOCOL)
 
@@ -116,8 +114,8 @@ local t = {
     x = 0, y = startY, z = 0, facing = facingName,
     home = { x = 0, y = startY, z = 0 }, distHome = 0,
     fuel = 0, fuelMax = 0, copper = 0, ores = 0, slots = 0,
-    moved = 0, progress = 0, progressMax = dist * rows,
-    row = 0, rows = rows, gps = false,
+    moved = 0, progress = 0, progressMax = length * width,
+    row = 0, rows = width, gps = false,
 }
 
 local function statusColour(s)
@@ -168,7 +166,7 @@ local function draw()
     setCol(fuelCol); term.write(string.sub(fuelText, 1, W - textX)); setCol()
 
     -- Pattern progress
-    local pmax  = math.max(1, t.progressMax or (dist * rows))
+    local pmax  = math.max(1, t.progressMax or (length * width))
     local pfrac = (t.progress or 0) / pmax
     put(7, " DIG")
     bar(barX, 7, barW, pfrac, colours.yellow)
@@ -177,8 +175,8 @@ local function draw()
     term.write(string.sub((t.progress or 0) .. "/" .. pmax, 1, W - textX))
     setCol()
 
-    field(8, "ROW", string.format("%d of %d   len %d  gap %d",
-        t.row or 0, t.rows or rows, dist, spacing), colours.yellow)
+    field(8, "LANE", string.format("%d of %d   room %d x %d",
+        t.row or 0, t.rows or width, width, length), colours.yellow)
     field(9, "HAUL", string.format("Cu %d  ore %d  slots %d/16",
         t.copper or 0, t.ores or 0, t.slots or 0), colours.orange)
     field(10, "TRAVEL", string.format("%d moved  GPS %s",

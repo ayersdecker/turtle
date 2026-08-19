@@ -340,6 +340,7 @@ local veinMine
 
 veinMine = function(depth)
     if veinBudget <= 0 or depth <= 0 or abortFlag then return end
+    local entryDir = dir
 
     local n = scan(turtle.inspectUp)
     if isOre(n) then
@@ -361,27 +362,31 @@ veinMine = function(depth)
         if isOre(n) then
             countMined(n); veinBudget = veinBudget - 1
             turtle.dig()
+            local stepDir = dir
             if forward() then
                 report("Vein mining", "node " .. (MAX_VEIN - veinBudget))
                 veinMine(depth - 1)
+                -- A deeper call can bail out mid-turn, so re-aim before backing out.
+                face(stepDir)
                 turnRight(); turnRight()
                 forward(false)
-                turnRight(); turnRight()
+                face(stepDir)
             end
         end
         turnRight()
     end
+    face(entryDir)
 end
 
+-- Only the three faces the turtle can already see are probed. Spinning a full
+-- circle on every block to look sideways was the constant twirling, and in a
+-- solid room those side blocks get mined by the next lane anyway.
 local function checkVein()
-    local found = isOre(scan(turtle.inspectUp)) or isOre(scan(turtle.inspectDown))
-    if not found then
-        for _ = 1, 4 do
-            if isOre(scan(turtle.inspect)) then found = true break end
-            turnRight()
-        end
+    if not (isOre(scan(turtle.inspectUp))
+         or isOre(scan(turtle.inspectDown))
+         or isOre(scan(turtle.inspect))) then
+        return
     end
-    if not found then return end
 
     veinBudget = MAX_VEIN
     local startDir = dir
@@ -476,7 +481,7 @@ local function mineRow(length, rowIndex, rows)
         if shouldStop() then return false end
 
         progress = progress + 1
-        report("Mining", "row " .. rowIndex .. "/" .. rows .. "  " .. i .. "/" .. length)
+        report("Mining", "lane " .. rowIndex .. "/" .. rows .. "  " .. i .. "/" .. length)
 
         if not forward() then
             report("BLOCKED", "unbreakable block ahead", true)
@@ -489,33 +494,31 @@ local function mineRow(length, rowIndex, rows)
     return true
 end
 
--- Serpentine (boustrophedon) pattern: mine a row, shift sideways by
--- `spacing`, then mine the next row back the other way.
-local function minePattern(rowLength, rows, spacing)
-    progress, progressMax = 0, rowLength * rows
-    curRow, totalRows = 1, rows
+-- Hollows out a solid rectangle: adjacent lanes with no gap between them,
+-- each lane 3 blocks tall (floor, body, ceiling).
+local function mineRoom(length, width)
+    progress, progressMax = 0, length * width
+    curRow, totalRows = 1, width
 
-    for r = 1, rows do
+    for r = 1, width do
         curRow = r
-        if not mineRow(rowLength, r, rows) then return end
+        if not mineRow(length, r, width) then return end
 
-        if r < rows then
-            report("Shifting", "to row " .. (r + 1), true)
+        if r < width then
+            report("Shifting", "to lane " .. (r + 1), true)
             local turn = (r % 2 == 1) and turnRight or turnLeft
             turn()
-            for _ = 1, spacing do
-                if shouldStop() then return end
-                if not forward() then
-                    report("BLOCKED", "cannot reach next row", true)
-                    return
-                end
-                turtle.digUp()
-                turtle.digDown()
+            if shouldStop() then return end
+            if not forward() then
+                report("BLOCKED", "cannot reach next lane", true)
+                return
             end
+            turtle.digUp()
+            turtle.digDown()
             turn()
         end
     end
-    report("Pattern complete", rows .. " rows x " .. rowLength, true)
+    report("Room complete", width .. " x " .. length, true)
 end
 
 ------------------------------ BOOTSTRAP ------------------------------
@@ -561,16 +564,15 @@ while true do
         home    = { x = pos.x, y = pos.y, z = pos.z }
         homeDir = dir
 
-        local targetY   = tonumber(msg.targetY) or DEFAULT_Y
-        local rowLength = tonumber(msg.dist) or 20
-        local rows      = math.max(1, tonumber(msg.rows) or 1)
-        local spacing   = math.max(1, tonumber(msg.spacing) or 3)
+        local targetY = tonumber(msg.targetY) or DEFAULT_Y
+        local length  = math.max(1, tonumber(msg.length) or 20)
+        local width   = math.max(1, tonumber(msg.width) or 1)
 
         report("Starting", "home locked in", true)
-        refuelFromInventory(rowLength * rows * 2 + rows * spacing + FUEL_RESERVE)
+        refuelFromInventory(length * width * 2 + width + FUEL_RESERVE)
 
         goToY(targetY)
-        if not abortFlag then minePattern(rowLength, rows, spacing) end
+        if not abortFlag then mineRoom(length, width) end
 
         -- Always walk back to the exact starting block, whatever happened.
         goHome()
