@@ -1,6 +1,8 @@
 local DISPLAY_SIDE = "top"
-local BOARD_WIDTH = 32
-local BOARD_HEIGHT = 16
+local BOARD_BLOCK_WIDTH = 9
+local BOARD_BLOCK_HEIGHT = 4
+local BOARD_WIDTH = math.floor((BOARD_BLOCK_WIDTH * 16 - 2) / 3.5)
+local BOARD_HEIGHT = BOARD_BLOCK_HEIGHT * 2
 local INNER_WIDTH = BOARD_WIDTH - 2
 local FEED_URL = "https://feeds.bbci.co.uk/news/rss.xml"
 local REFRESH_SECONDS = 900
@@ -263,25 +265,18 @@ end
 local function drawHeadline(headline, storyIndex, storyCount, tickerText, tick)
 local lines = wrapText(headline, INNER_WIDTH)
 local border = "+" .. string.rep("-", INNER_WIDTH) .. "+"
-local status = "LIVE " .. tostring(storyIndex) .. "/" .. tostring(storyCount) .. "  " .. timeStamp()
+local title = "BBC NEWS  |  LIVE " .. tostring(storyIndex) .. "/" .. tostring(storyCount) .. "  |  " .. timeStamp()
+local pulse = (tick % 2 == 0) and "*" or " "
 
 clearDisplay()
 writeLine(1, border)
-writeLine(2, "|" .. centerField("BBC NEWS", INNER_WIDTH) .. "|")
-writeLine(3, boxed(status))
+writeLine(2, "|" .. centerField(title, INNER_WIDTH) .. "|")
+writeLine(3, "|" .. centerField(pulse .. " REAL WORLD HEADLINES " .. pulse, INNER_WIDTH) .. "|")
 writeLine(4, border)
-writeLine(5, boxed(""))
-writeLine(6, boxed(lines[1] or ""))
-writeLine(7, boxed(lines[2] or ""))
-writeLine(8, boxed(lines[3] or ""))
-writeLine(9, boxed(lines[4] or ""))
-writeLine(10, boxed(lines[5] or ""))
-writeLine(11, boxed(lines[6] or ""))
-writeLine(12, boxed(""))
-writeLine(13, border)
-writeLine(14, boxed("REAL WORLD HEADLINES"))
-writeLine(15, "|" .. tickerWindow(tickerText, tick) .. "|")
-writeLine(16, border)
+writeLine(5, boxed(lines[1] or ""))
+writeLine(6, boxed(lines[2] or ""))
+writeLine(7, "|" .. tickerWindow(tickerText, tick) .. "|")
+writeLine(8, border)
 
 flushDisplay()
 end
