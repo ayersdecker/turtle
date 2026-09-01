@@ -1,64 +1,42 @@
--- News Ticker Script for a 4x8 Create Display Board via CC:Tweaked
--- Make sure the Display Link is placed directly touching this computer 
-
--- 1. Wrap the Display Link peripheral
 local display = peripheral.find("display_link") 
 
 if not display then
-error("Error: Could not find a Display Link peripheral attached to the computer!")
+error("Display Link not found!")
 end 
 
--- 2. Define the trending news database
--- Each story is perfectly sized to stand out on a 4-row high board
 local news_feed = {
 {
 headline = "BREAKING NEWS",
-subtext  = "Nether Portal Safety Laws Passed"
+subtext  = "Portal Laws Passed"
 },
 {
 headline = "MARKET WATCH",
-subtext  = "Diamond Prices Drop 12% in Overworld"
+subtext  = "Diamond Price Drops"
 },
 {
 headline = "LOCAL AFFAIRS",
-subtext  = "Stray Creeper Found Near Spawn Point"
+subtext  = "Creeper Near Spawn"
 },
 {
 headline = "WEATHER UPDATE",
-subtext  = "Heavy Thunderstorm Forecasted for Tonight"
+subtext  = "Heavy Storms Tonight"
 },
 {
 headline = "TECH INNOVATION",
-subtext  = "New Auto-Sorter Blueprint Released"
+subtext  = "Auto-Sorter Online"
 }
 } 
 
-print("Starting Top Trending News display loop... (Press Ctrl+T to stop)") 
+print("Running news loop...") 
 
--- 3. Run the infinite display cycle
 while true do
-for index, story in ipairs(news_feed) do
--- Clear the internal peripheral buffer before writing fresh lines
-display.clear() 
-
--- Row 1: Visual buffer / spacing
-display.write("") 
-
--- Row 2: Main bold headline topic
+for i, story in ipairs(news_feed) do
+display.clear()
+display.write("")
 display.write(story.headline)
-
--- Row 3: Subtext or description detail
 display.write(story.subtext)
-
--- Row 4: Visual buffer / footer separation
-display.write("") 
-
--- Push changes from the internal buffer to the physical board
+display.write("")
 display.update()
-
--- Hold each news story on the screen for 8 seconds before moving to the next
 sleep(8)
-
 end
-
 end
