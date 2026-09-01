@@ -1,7 +1,89 @@
-local display = peripheral.find("display_link")
+local function attachedPeripherals()
+local names = peripheral.getNames()
+local attached = {}
+
+for i, name in ipairs(names) do
+attached[i] = name .. " (" .. peripheral.getType(name) .. ")"
+end
+
+return table.concat(attached, ", ")
+end
+
+local function findDisplay()
+local found = peripheral.find("display_link") or peripheral.find("monitor")
+
+if found then
+return found
+end
+
+for _, name in ipairs(peripheral.getNames()) do
+local device = peripheral.wrap(name)
+
+if device and (type(device.setCursorPos) == "function" or type(device.setLine) == "function" or type(device.write) == "function") then
+return device
+end
+end
+
+return nil
+end
+
+local display = findDisplay()
 
 if not display then
-error("Display Link not found!")
+error("Display Link not found. Attached peripherals: " .. attachedPeripherals())
+end
+
+local function hasMethod(name)
+return type(display[name]) == "function"
+end
+
+local function methodList()
+local name = peripheral.getName and peripheral.getName(display)
+
+if not name or not peripheral.getMethods then
+return "unknown"
+end
+
+local methods = peripheral.getMethods(name) or {}
+return table.concat(methods, ", ")
+end
+
+local function clearDisplay()
+if hasMethod("clear") then
+display.clear()
+end
+end
+
+local function writeLine(line, text)
+text = tostring(text or "")
+
+if hasMethod("setCursorPos") and hasMethod("clearLine") and hasMethod("write") then
+display.setCursorPos(1, line)
+display.clearLine()
+display.write(text)
+return
+end
+
+if hasMethod("setLine") then
+display.setLine(line, text)
+return
+end
+
+if hasMethod("write") then
+display.write(text)
+display.write("\n")
+return
+end
+
+error("Display has no supported write method. Methods: " .. methodList())
+end
+
+local function flushDisplay()
+if hasMethod("update") then
+display.update()
+elseif hasMethod("push") then
+display.push()
+end
 end
 
 local news_feed = {
@@ -31,12 +113,12 @@ print("Running news loop...")
 
 while true do
 for i, story in ipairs(news_feed) do
-display.clear()
-display.write("")
-display.write(story.headline)
-display.write(story.subtext)
-display.write("")
-display.update()
+clearDisplay()
+writeLine(1, "")
+writeLine(2, story.headline)
+writeLine(3, story.subtext)
+writeLine(4, "")
+flushDisplay()
 sleep(8)
 end
 end
