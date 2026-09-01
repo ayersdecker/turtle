@@ -1,8 +1,8 @@
-local display = peripheral.find("display_link") 
+local display = peripheral.find("display_link")
 
 if not display then
 error("Display Link not found!")
-end 
+end
 
 local news_feed = {
 {
@@ -25,9 +25,9 @@ subtext  = "Heavy Storms Tonight"
 headline = "TECH INNOVATION",
 subtext  = "Auto-Sorter Online"
 }
-} 
+}
 
-print("Running news loop...") 
+print("Running news loop...")
 
 while true do
 for i, story in ipairs(news_feed) do
