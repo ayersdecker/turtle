@@ -1,9 +1,11 @@
 local DISPLAY_SIDE = "top"
-local BOARD_WIDTH = 16
-local BOARD_HEIGHT = 8
+local BOARD_WIDTH = 32
+local BOARD_HEIGHT = 16
+local INNER_WIDTH = BOARD_WIDTH - 2
 local FEED_URL = "https://feeds.bbci.co.uk/news/rss.xml"
 local REFRESH_SECONDS = 900
-local STORY_SECONDS = 10
+local STORY_SECONDS = 12
+local FRAME_SECONDS = 1
 
 local function attachedPeripherals()
 	local names = peripheral.getNames()
@@ -75,6 +77,32 @@ return string.sub(text, 1, BOARD_WIDTH)
 end
 
 return text .. string.rep(" ", BOARD_WIDTH - #text)
+end
+
+local function fitField(text, width)
+text = tostring(text or "")
+
+if #text > width then
+return string.sub(text, 1, width)
+end
+
+return text .. string.rep(" ", width - #text)
+end
+
+local function centerField(text, width)
+text = tostring(text or "")
+
+if #text > width then
+return string.sub(text, 1, width)
+end
+
+local left = math.floor((width - #text) / 2)
+local right = width - #text - left
+return string.rep(" ", left) .. text .. string.rep(" ", right)
+end
+
+local function boxed(text)
+return "|" .. fitField(text, INNER_WIDTH) .. "|"
 end
 
 local function writeLine(line, text)
@@ -182,26 +210,27 @@ end
 return headlines
 end
 
-local function wrapText(text)
+local function wrapText(text, width)
+width = width or BOARD_WIDTH
 local lines = {}
 local current = ""
 
 for word in text:gmatch("%S+") do
-if #word > BOARD_WIDTH then
+if #word > width then
 if current ~= "" then
 lines[#lines + 1] = current
 current = ""
 end
 
-while #word > BOARD_WIDTH do
-lines[#lines + 1] = string.sub(word, 1, BOARD_WIDTH)
-word = string.sub(word, BOARD_WIDTH + 1)
+while #word > width do
+lines[#lines + 1] = string.sub(word, 1, width)
+word = string.sub(word, width + 1)
 end
 end
 
 if current == "" then
 current = word
-elseif #current + 1 + #word <= BOARD_WIDTH then
+elseif #current + 1 + #word <= width then
 current = current .. " " .. word
 else
 lines[#lines + 1] = current
@@ -216,16 +245,43 @@ end
 return lines
 end
 
-local function drawHeadline(headline)
-local lines = wrapText(headline)
+local function tickerWindow(text, offset)
+local ticker = "   >>> " .. cleanText(text) .. "   "
+local doubled = ticker .. ticker
+offset = (offset % #ticker) + 1
+return string.sub(doubled, offset, offset + INNER_WIDTH - 1)
+end
+
+local function timeStamp()
+if os.date then
+return os.date("%H:%M")
+end
+
+return "--:--"
+end
+
+local function drawHeadline(headline, storyIndex, storyCount, tickerText, tick)
+local lines = wrapText(headline, INNER_WIDTH)
+local border = "+" .. string.rep("-", INNER_WIDTH) .. "+"
+local status = "LIVE " .. tostring(storyIndex) .. "/" .. tostring(storyCount) .. "  " .. timeStamp()
 
 clearDisplay()
-writeLine(1, "BBC NEWS")
-writeLine(2, string.rep("-", BOARD_WIDTH))
-
-for line = 3, BOARD_HEIGHT do
-writeLine(line, lines[line - 2] or "")
-end
+writeLine(1, border)
+writeLine(2, "|" .. centerField("BBC NEWS", INNER_WIDTH) .. "|")
+writeLine(3, boxed(status))
+writeLine(4, border)
+writeLine(5, boxed(""))
+writeLine(6, boxed(lines[1] or ""))
+writeLine(7, boxed(lines[2] or ""))
+writeLine(8, boxed(lines[3] or ""))
+writeLine(9, boxed(lines[4] or ""))
+writeLine(10, boxed(lines[5] or ""))
+writeLine(11, boxed(lines[6] or ""))
+writeLine(12, boxed(""))
+writeLine(13, border)
+writeLine(14, boxed("REAL WORLD HEADLINES"))
+writeLine(15, "|" .. tickerWindow(tickerText, tick) .. "|")
+writeLine(16, border)
 
 flushDisplay()
 end
@@ -243,7 +299,11 @@ lastRefresh = os.clock()
 break
 end
 
-drawHeadline(headline)
-sleep(STORY_SECONDS)
+local nextHeadline = headlines[(i % #headlines) + 1] or headline
+
+for tick = 0, STORY_SECONDS - 1 do
+drawHeadline(headline, i, #headlines, nextHeadline, tick)
+sleep(FRAME_SECONDS)
+end
 end
 end
