@@ -10,6 +10,12 @@ return table.concat(attached, ", ")
 end
 
 local function findDisplay()
+local top = peripheral.wrap("top")
+
+if top then
+return top
+end
+
 local found = peripheral.find("display_link") or peripheral.find("monitor")
 
 if found then
