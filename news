@@ -1,16 +1,23 @@
+local DISPLAY_SIDE = "top"
+local BOARD_WIDTH = 16
+local BOARD_HEIGHT = 8
+local FEED_URL = "https://feeds.bbci.co.uk/news/rss.xml"
+local REFRESH_SECONDS = 900
+local STORY_SECONDS = 10
+
 local function attachedPeripherals()
-local names = peripheral.getNames()
-local attached = {}
+	local names = peripheral.getNames()
+	local attached = {}
 
-for i, name in ipairs(names) do
-attached[i] = name .. " (" .. peripheral.getType(name) .. ")"
-end
+	for i, name in ipairs(names) do
+		attached[i] = name .. " (" .. peripheral.getType(name) .. ")"
+	end
 
-return table.concat(attached, ", ")
+	return table.concat(attached, ", ")
 end
 
 local function findDisplay()
-local top = peripheral.wrap("top")
+local top = peripheral.wrap(DISPLAY_SIDE)
 
 if top then
 return top
@@ -36,7 +43,7 @@ end
 local display = findDisplay()
 
 if not display then
-error("Display Link not found. Attached peripherals: " .. attachedPeripherals())
+error("Display Link not found on " .. DISPLAY_SIDE .. ". Attached peripherals: " .. attachedPeripherals())
 end
 
 local function hasMethod(name)
@@ -60,8 +67,18 @@ display.clear()
 end
 end
 
-local function writeLine(line, text)
+local function fitLine(text)
 text = tostring(text or "")
+
+if #text > BOARD_WIDTH then
+return string.sub(text, 1, BOARD_WIDTH)
+end
+
+return text .. string.rep(" ", BOARD_WIDTH - #text)
+end
+
+local function writeLine(line, text)
+text = fitLine(text)
 
 if hasMethod("setCursorPos") and hasMethod("clearLine") and hasMethod("write") then
 display.setCursorPos(1, line)
@@ -92,39 +109,141 @@ display.push()
 end
 end
 
-local news_feed = {
-{
-headline = "BREAKING NEWS",
-subtext  = "Portal Laws Passed"
-},
-{
-headline = "MARKET WATCH",
-subtext  = "Diamond Price Drops"
-},
-{
-headline = "LOCAL AFFAIRS",
-subtext  = "Creeper Near Spawn"
-},
-{
-headline = "WEATHER UPDATE",
-subtext  = "Heavy Storms Tonight"
-},
-{
-headline = "TECH INNOVATION",
-subtext  = "Auto-Sorter Online"
-}
-}
+local function xmlDecode(text)
+text = text:gsub("<!%[CDATA%[(.-)%]%]>", "%1")
+text = text:gsub("&amp;", "&")
+text = text:gsub("&quot;", "\"")
+text = text:gsub("&apos;", "'")
+text = text:gsub("&lt;", "<")
+text = text:gsub("&gt;", ">")
+return text
+end
 
-print("Running news loop...")
+local function cleanText(text)
+text = xmlDecode(text or "")
+text = text:gsub("[^%w%p%s]", "")
+text = text:gsub("%s+", " ")
+text = text:gsub("^%s+", "")
+text = text:gsub("%s+$", "")
+return text
+end
+
+local function fetchFeed()
+if not http then
+return nil, "HTTP disabled"
+end
+
+local response, reason = http.get(FEED_URL)
+
+if not response then
+return nil, tostring(reason or "fetch failed")
+end
+
+local body = response.readAll()
+response.close()
+return body
+end
+
+local function parseHeadlines(body)
+local headlines = {}
+
+for item in body:gmatch("<item.->(.-)</item>") do
+local title = item:match("<title>(.-)</title>")
+
+if title then
+headlines[#headlines + 1] = cleanText(title)
+end
+end
+
+return headlines
+end
+
+local function fallbackHeadlines(reason)
+return {
+"BBC RSS unavailable",
+"Check CC http",
+tostring(reason or "try again later")
+}
+end
+
+local function loadHeadlines()
+local body, reason = fetchFeed()
+
+if not body then
+return fallbackHeadlines(reason)
+end
+
+local headlines = parseHeadlines(body)
+
+if #headlines == 0 then
+return fallbackHeadlines("no headlines")
+end
+
+return headlines
+end
+
+local function wrapText(text)
+local lines = {}
+local current = ""
+
+for word in text:gmatch("%S+") do
+if #word > BOARD_WIDTH then
+if current ~= "" then
+lines[#lines + 1] = current
+current = ""
+end
+
+while #word > BOARD_WIDTH do
+lines[#lines + 1] = string.sub(word, 1, BOARD_WIDTH)
+word = string.sub(word, BOARD_WIDTH + 1)
+end
+end
+
+if current == "" then
+current = word
+elseif #current + 1 + #word <= BOARD_WIDTH then
+current = current .. " " .. word
+else
+lines[#lines + 1] = current
+current = word
+end
+end
+
+if current ~= "" then
+lines[#lines + 1] = current
+end
+
+return lines
+end
+
+local function drawHeadline(headline)
+local lines = wrapText(headline)
+
+clearDisplay()
+writeLine(1, "BBC NEWS")
+writeLine(2, string.rep("-", BOARD_WIDTH))
+
+for line = 3, BOARD_HEIGHT do
+writeLine(line, lines[line - 2] or "")
+end
+
+flushDisplay()
+end
+
+print("Running real news loop...")
+
+local headlines = loadHeadlines()
+local lastRefresh = os.clock()
 
 while true do
-for i, story in ipairs(news_feed) do
-clearDisplay()
-writeLine(1, "")
-writeLine(2, story.headline)
-writeLine(3, story.subtext)
-writeLine(4, "")
-flushDisplay()
-sleep(8)
+for i, headline in ipairs(headlines) do
+if os.clock() - lastRefresh > REFRESH_SECONDS then
+headlines = loadHeadlines()
+lastRefresh = os.clock()
+break
+end
+
+drawHeadline(headline)
+sleep(STORY_SECONDS)
 end
 end
