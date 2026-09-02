@@ -97,166 +97,165 @@ local function draw(lines)
 	flushDisplay()
 end
 
-local function center(text)
-	if #text >= WIDTH then
-		return string.sub(text, 1, WIDTH)
-	end
-
-	local left = math.floor((WIDTH - #text) / 2)
-	return string.rep(" ", left) .. text
-end
-
-local function repeatToWidth(pattern, offset)
-	local line = ""
-	offset = offset or 0
-
-	while #line < WIDTH + #pattern do
-		line = line .. pattern
-	end
-
-	return string.sub(line, offset + 1, offset + WIDTH)
-end
-
-local function sceneIntro(frame)
-	local lines = {}
-	local title = "CREATE DISPLAY SHOW"
-	local sweep = (frame % WIDTH) + 1
+local function makeCanvas(fill)
+	local canvas = {}
+	fill = fill or " "
 
 	for y = 1, HEIGHT do
-		local row = {}
+		canvas[y] = {}
 
 		for x = 1, WIDTH do
-			if x == sweep or x == WIDTH - sweep + 1 then
-				row[x] = "|"
-			elseif y == 1 or y == HEIGHT then
-				row[x] = "-"
-			elseif x == 1 or x == WIDTH then
-				row[x] = "|"
-			else
-				row[x] = " "
-			end
+			canvas[y][x] = fill
 		end
-
-		lines[y] = table.concat(row)
 	end
 
-	lines[3] = center(title)
-	lines[5] = center("40 x 8 TEXT CINEMA")
-	lines[6] = center("PRESS CTRL+T TO STOP")
-	return lines
+	return canvas
 end
 
-local function sceneWave(frame)
-	local lines = {}
-	local marks = { ".", "-", "=", "#", "=", "-" }
-
-	for y = 1, HEIGHT do
-		local row = {}
-
-		for x = 1, WIDTH do
-			local value = (x + frame + y * 3) % #marks
-			row[x] = marks[value + 1]
-		end
-
-		lines[y] = table.concat(row)
+local function setChar(canvas, x, y, char)
+	if x < 1 or x > WIDTH or y < 1 or y > HEIGHT then
+		return
 	end
 
-	lines[1] = "~~~ SIGNAL WAVE ~~~~~~~~~~~~~~~~~~~~~~~"
-	return lines
+	if char ~= " " then
+		canvas[y][x] = char
+	end
 end
 
-local function sceneTunnel(frame)
+local function putText(canvas, x, y, text)
+	for i = 1, #text do
+		setChar(canvas, x + i - 1, y, string.sub(text, i, i))
+	end
+end
+
+local function putSprite(canvas, x, y, sprite)
+	for row = 1, #sprite do
+		local line = sprite[row]
+
+		for col = 1, #line do
+			setChar(canvas, x + col - 1, y + row - 1, string.sub(line, col, col))
+		end
+	end
+end
+
+local function canvasLines(canvas)
 	local lines = {}
-	local chars = { "#", "*", "+", ".", " " }
-	local cx = math.floor(WIDTH / 2)
-	local cy = math.floor(HEIGHT / 2)
 
 	for y = 1, HEIGHT do
-		local row = {}
-
-		for x = 1, WIDTH do
-			local dist = math.max(math.abs(x - cx), math.abs(y - cy))
-			row[x] = chars[((dist + frame) % #chars) + 1]
-		end
-
-		lines[y] = table.concat(row)
+		lines[y] = table.concat(canvas[y])
 	end
 
 	return lines
 end
 
-local function sceneBars(frame)
-	local lines = {}
+local function sceneDino(frame)
+	local canvas = makeCanvas(" ")
+	local ground = HEIGHT - 1
+	local dinoY = ground - 3
+	local legFrame = frame % 4 < 2
+	local dino = legFrame and {
+		"  __ ",
+		" /oo|",
+		"/|__ ",
+		" /  \\",
+	} or {
+		"  __ ",
+		" /oo|",
+		"/|__ ",
+		" \\  /",
+	}
 
-	for y = 1, HEIGHT do
-		lines[y] = string.rep(" ", WIDTH)
-	end
+	putText(canvas, 2, 1, "NO INTERNET?  DINO RUN")
 
 	for x = 1, WIDTH do
-		local barHeight = ((x * 3 + frame * 2) % HEIGHT) + 1
-
-		for y = HEIGHT, HEIGHT - barHeight + 1, -1 do
-			local line = lines[y]
-			lines[y] = string.sub(line, 1, x - 1) .. "#" .. string.sub(line, x + 1)
-		end
+		setChar(canvas, x, ground, x % 2 == frame % 2 and "_" or "-")
 	end
 
-	lines[1] = "AUDIO VISUALIZER  " .. repeatToWidth(".|", frame % 2)
-	return lines
+	putSprite(canvas, 4, dinoY, dino)
+
+	for i = 0, 2 do
+		local cactusX = WIDTH - ((frame * 2 + i * 15) % (WIDTH + 12))
+		putSprite(canvas, cactusX, ground - 2, { " | ", "-|-", " | " })
+	end
+
+	local cloudX = WIDTH - ((frame + 5) % (WIDTH + 10))
+	putSprite(canvas, cloudX, 2, { " .--. ", "(____)" })
+	return canvasLines(canvas)
 end
 
-local function sceneRain(frame)
-	local lines = {}
-	local alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+local function sceneMoonLanding(frame)
+	local canvas = makeCanvas(" ")
+	local shipX = WIDTH - ((frame * 2) % (WIDTH + 10))
+	local shipY = 2 + math.floor((frame % 16) / 6)
 
-	for y = 1, HEIGHT do
-		local row = {}
+	putText(canvas, 2, 1, "APOLLO FEED // LOW ORBIT")
+	putSprite(canvas, shipX, shipY, { " /\\", "|==>", " \\/" })
 
-		for x = 1, WIDTH do
-			if (x * 5 + y * 7 + frame) % 6 == 0 then
-				local index = ((x * 11 + y * 13 + frame) % #alphabet) + 1
-				row[x] = string.sub(alphabet, index, index)
-			else
-				row[x] = " "
-			end
-		end
-
-		lines[y] = table.concat(row)
+	for i = 1, 12 do
+		local starX = ((i * 11 + frame) % WIDTH) + 1
+		local starY = ((i * 7) % 5) + 2
+		setChar(canvas, starX, starY, i % 3 == 0 and "+" or ".")
 	end
 
-	lines[1] = "DATA RAIN // CREATE LINK ONLINE"
-	return lines
+	putText(canvas, 1, HEIGHT - 1, "__..---..____..---..____..---..__")
+	putText(canvas, 5, HEIGHT, "MOON CAM 1969  SIGNAL: LOCKED")
+	return canvasLines(canvas)
 end
 
-local function sceneMarquee(frame)
-	local lines = {}
-	local message = "   CREATE DISPLAY BOARD VIDEO WALL   TURTLE NETWORK LIVE   "
-	local doubled = message .. message .. message
-	local offset = (frame % #message) + 1
-	local ticker = string.sub(doubled, offset, offset + WIDTH - 1)
+local function sceneCityTrain(frame)
+	local canvas = makeCanvas(" ")
+	local trainX = WIDTH - ((frame * 2) % (WIDTH + 28))
 
-	for y = 1, HEIGHT do
-		if y == 1 or y == HEIGHT then
-			lines[y] = repeatToWidth("<>--", frame % 4)
-		elseif y == 4 then
-			lines[y] = ticker
-		elseif y == 5 then
-			lines[y] = center("ASCII MOTION WALL")
-		else
-			lines[y] = repeatToWidth(" . ", (frame + y) % 3)
-		end
+	putText(canvas, 1, 1, "NIGHT TRAIN ARRIVING PLATFORM 4")
+	putText(canvas, 1, 2, "[]  []  []   []  []   []  []   []")
+	putText(canvas, 1, 3, " |  |   |     |  |    |   |    |")
+	putSprite(canvas, trainX, 4, {
+		" ________________________ ",
+		"| [] [] [] [] [] [] []  |",
+		"|________________________|",
+		"  o  o  o  o  o  o  o   ",
+	})
+
+	return canvasLines(canvas)
+end
+
+local function sceneOcean(frame)
+	local canvas = makeCanvas(" ")
+	local sunX = 6 + math.floor((frame % 28) / 2)
+
+	putText(canvas, sunX, 2, "\\ | /")
+	putText(canvas, sunX + 1, 3, "-O-")
+	putText(canvas, sunX, 4, "/ | \\")
+
+	for y = 5, HEIGHT do
+		local wave = (frame + y) % 4
+		local line = string.sub("~~~~____~~~~____~~~~____~~~~____~~~~____", wave + 1, wave + WIDTH)
+		putText(canvas, 1, y, line)
 	end
 
-	return lines
+	putText(canvas, 2, 1, "SUNSET LOOP // DISPLAY BOARD TV")
+	return canvasLines(canvas)
+end
+
+local function sceneLoading(frame)
+	local canvas = makeCanvas(" ")
+	local barWidth = WIDTH - 8
+	local progress = frame % (barWidth + 1)
+
+	putText(canvas, 7, 2, "GOOGLE-ISH LOADING")
+	putText(canvas, 4, 4, "+" .. string.rep("-", barWidth) .. "+")
+	putText(canvas, 4, 5, "|" .. string.rep("#", progress) .. string.rep(" ", barWidth - progress) .. "|")
+	putText(canvas, 4, 6, "+" .. string.rep("-", barWidth) .. "+")
+	putText(canvas, 9, 8, "PLEASE WAIT " .. string.sub("....", 1, (frame % 4) + 1))
+	return canvasLines(canvas)
 end
 
 local scenes = {
-	sceneIntro,
-	sceneWave,
-	sceneTunnel,
-	sceneBars,
-	sceneRain,
-	sceneMarquee,
+	sceneDino,
+	sceneMoonLanding,
+	sceneCityTrain,
+	sceneOcean,
+	sceneLoading,
 }
 
 print("Running display patterns on " .. WIDTH .. "x" .. HEIGHT .. " board...")
