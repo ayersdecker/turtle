@@ -1,0 +1,271 @@
+local DISPLAY_SIDE = "top"
+local BOARD_BLOCK_WIDTH = 9
+local BOARD_BLOCK_HEIGHT = 4
+local WIDTH = math.floor((BOARD_BLOCK_WIDTH * 16 - 2) / 3.5)
+local HEIGHT = BOARD_BLOCK_HEIGHT * 2
+local FRAME_SECONDS = 0.18
+
+local function attachedPeripherals()
+	local names = peripheral.getNames()
+	local attached = {}
+
+	for i, name in ipairs(names) do
+		attached[i] = name .. " (" .. peripheral.getType(name) .. ")"
+	end
+
+	return table.concat(attached, ", ")
+end
+
+local display = peripheral.wrap(DISPLAY_SIDE)
+
+if not display then
+	error("No Display Link on " .. DISPLAY_SIDE .. ". Attached peripherals: " .. attachedPeripherals())
+end
+
+local function hasMethod(name)
+	return type(display[name]) == "function"
+end
+
+local function methodList()
+	local methods = {}
+
+	for name, value in pairs(display) do
+		if type(value) == "function" then
+			methods[#methods + 1] = name
+		end
+	end
+
+	table.sort(methods)
+	return table.concat(methods, ", ")
+end
+
+local function fit(text)
+	text = tostring(text or "")
+
+	if #text > WIDTH then
+		return string.sub(text, 1, WIDTH)
+	end
+
+	return text .. string.rep(" ", WIDTH - #text)
+end
+
+local function clearDisplay()
+	if hasMethod("clear") then
+		display.clear()
+	end
+end
+
+local function writeLine(line, text)
+	text = fit(text)
+
+	if hasMethod("setCursorPos") and hasMethod("clearLine") and hasMethod("write") then
+		display.setCursorPos(1, line)
+		display.clearLine()
+		display.write(text)
+		return
+	end
+
+	if hasMethod("setLine") then
+		display.setLine(line, text)
+		return
+	end
+
+	if hasMethod("write") then
+		display.write(text)
+		display.write("\n")
+		return
+	end
+
+	error("Display has no supported write method. Methods: " .. methodList())
+end
+
+local function flushDisplay()
+	if hasMethod("update") then
+		display.update()
+	elseif hasMethod("push") then
+		display.push()
+	end
+end
+
+local function draw(lines)
+	clearDisplay()
+
+	for y = 1, HEIGHT do
+		writeLine(y, lines[y] or "")
+	end
+
+	flushDisplay()
+end
+
+local function center(text)
+	if #text >= WIDTH then
+		return string.sub(text, 1, WIDTH)
+	end
+
+	local left = math.floor((WIDTH - #text) / 2)
+	return string.rep(" ", left) .. text
+end
+
+local function repeatToWidth(pattern, offset)
+	local line = ""
+	offset = offset or 0
+
+	while #line < WIDTH + #pattern do
+		line = line .. pattern
+	end
+
+	return string.sub(line, offset + 1, offset + WIDTH)
+end
+
+local function sceneIntro(frame)
+	local lines = {}
+	local title = "CREATE DISPLAY SHOW"
+	local sweep = (frame % WIDTH) + 1
+
+	for y = 1, HEIGHT do
+		local row = {}
+
+		for x = 1, WIDTH do
+			if x == sweep or x == WIDTH - sweep + 1 then
+				row[x] = "|"
+			elseif y == 1 or y == HEIGHT then
+				row[x] = "-"
+			elseif x == 1 or x == WIDTH then
+				row[x] = "|"
+			else
+				row[x] = " "
+			end
+		end
+
+		lines[y] = table.concat(row)
+	end
+
+	lines[3] = center(title)
+	lines[5] = center("40 x 8 TEXT CINEMA")
+	lines[6] = center("PRESS CTRL+T TO STOP")
+	return lines
+end
+
+local function sceneWave(frame)
+	local lines = {}
+	local marks = { ".", "-", "=", "#", "=", "-" }
+
+	for y = 1, HEIGHT do
+		local row = {}
+
+		for x = 1, WIDTH do
+			local value = (x + frame + y * 3) % #marks
+			row[x] = marks[value + 1]
+		end
+
+		lines[y] = table.concat(row)
+	end
+
+	lines[1] = "~~~ SIGNAL WAVE ~~~~~~~~~~~~~~~~~~~~~~~"
+	return lines
+end
+
+local function sceneTunnel(frame)
+	local lines = {}
+	local chars = { "#", "*", "+", ".", " " }
+	local cx = math.floor(WIDTH / 2)
+	local cy = math.floor(HEIGHT / 2)
+
+	for y = 1, HEIGHT do
+		local row = {}
+
+		for x = 1, WIDTH do
+			local dist = math.max(math.abs(x - cx), math.abs(y - cy))
+			row[x] = chars[((dist + frame) % #chars) + 1]
+		end
+
+		lines[y] = table.concat(row)
+	end
+
+	return lines
+end
+
+local function sceneBars(frame)
+	local lines = {}
+
+	for y = 1, HEIGHT do
+		lines[y] = string.rep(" ", WIDTH)
+	end
+
+	for x = 1, WIDTH do
+		local barHeight = ((x * 3 + frame * 2) % HEIGHT) + 1
+
+		for y = HEIGHT, HEIGHT - barHeight + 1, -1 do
+			local line = lines[y]
+			lines[y] = string.sub(line, 1, x - 1) .. "#" .. string.sub(line, x + 1)
+		end
+	end
+
+	lines[1] = "AUDIO VISUALIZER  " .. repeatToWidth(".|", frame % 2)
+	return lines
+end
+
+local function sceneRain(frame)
+	local lines = {}
+	local alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+	for y = 1, HEIGHT do
+		local row = {}
+
+		for x = 1, WIDTH do
+			if (x * 5 + y * 7 + frame) % 6 == 0 then
+				local index = ((x * 11 + y * 13 + frame) % #alphabet) + 1
+				row[x] = string.sub(alphabet, index, index)
+			else
+				row[x] = " "
+			end
+		end
+
+		lines[y] = table.concat(row)
+	end
+
+	lines[1] = "DATA RAIN // CREATE LINK ONLINE"
+	return lines
+end
+
+local function sceneMarquee(frame)
+	local lines = {}
+	local message = "   CREATE DISPLAY BOARD VIDEO WALL   TURTLE NETWORK LIVE   "
+	local doubled = message .. message .. message
+	local offset = (frame % #message) + 1
+	local ticker = string.sub(doubled, offset, offset + WIDTH - 1)
+
+	for y = 1, HEIGHT do
+		if y == 1 or y == HEIGHT then
+			lines[y] = repeatToWidth("<>--", frame % 4)
+		elseif y == 4 then
+			lines[y] = ticker
+		elseif y == 5 then
+			lines[y] = center("ASCII MOTION WALL")
+		else
+			lines[y] = repeatToWidth(" . ", (frame + y) % 3)
+		end
+	end
+
+	return lines
+end
+
+local scenes = {
+	sceneIntro,
+	sceneWave,
+	sceneTunnel,
+	sceneBars,
+	sceneRain,
+	sceneMarquee,
+}
+
+print("Running display patterns on " .. WIDTH .. "x" .. HEIGHT .. " board...")
+
+local frame = 0
+
+while true do
+	local scene = scenes[(math.floor(frame / 36) % #scenes) + 1]
+	draw(scene(frame))
+	frame = frame + 1
+	sleep(FRAME_SECONDS)
+end
