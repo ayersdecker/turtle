@@ -148,114 +148,197 @@ local function canvasLines(canvas)
 	return lines
 end
 
-local function sceneDino(frame)
+local function patternLines(frame, palette, pattern)
 	local canvas = makeCanvas(" ")
-	local ground = HEIGHT - 1
-	local dinoY = ground - 3
-	local legFrame = frame % 4 < 2
-	local dino = legFrame and {
-		"  __ ",
-		" /oo|",
-		"/|__ ",
-		" /  \\",
-	} or {
-		"  __ ",
-		" /oo|",
-		"/|__ ",
-		" \\  /",
-	}
 
-	putText(canvas, 2, 1, "NO INTERNET?  DINO RUN")
-
-	for x = 1, WIDTH do
-		setChar(canvas, x, ground, x % 2 == frame % 2 and "_" or "-")
+	for row = 1, HEIGHT do
+		for column = 1, WIDTH do
+			local value = pattern(column, row, frame)
+			setChar(canvas, column, row, palette[(value % #palette) + 1])
+		end
 	end
-
-	putSprite(canvas, 4, dinoY, dino)
-
-	for i = 0, 2 do
-		local cactusX = WIDTH - ((frame * 2 + i * 15) % (WIDTH + 12))
-		putSprite(canvas, cactusX, ground - 2, { " | ", "-|-", " | " })
-	end
-
-	local cloudX = WIDTH - ((frame + 5) % (WIDTH + 10))
-	putSprite(canvas, cloudX, 2, { " .--. ", "(____)" })
-	return canvasLines(canvas)
-end
-
-local function sceneMoonLanding(frame)
-	local canvas = makeCanvas(" ")
-	local shipX = WIDTH - ((frame * 2) % (WIDTH + 10))
-	local shipY = 2 + math.floor((frame % 16) / 6)
-
-	putText(canvas, 2, 1, "APOLLO FEED // LOW ORBIT")
-	putSprite(canvas, shipX, shipY, { " /\\", "|==>", " \\/" })
-
-	for i = 1, 12 do
-		local starX = ((i * 11 + frame) % WIDTH) + 1
-		local starY = ((i * 7) % 5) + 2
-		setChar(canvas, starX, starY, i % 3 == 0 and "+" or ".")
-	end
-
-	putText(canvas, 1, HEIGHT - 1, "__..---..____..---..____..---..__")
-	putText(canvas, 5, HEIGHT, "MOON CAM 1969  SIGNAL: LOCKED")
-	return canvasLines(canvas)
-end
-
-local function sceneCityTrain(frame)
-	local canvas = makeCanvas(" ")
-	local trainX = WIDTH - ((frame * 2) % (WIDTH + 28))
-
-	putText(canvas, 1, 1, "NIGHT TRAIN ARRIVING PLATFORM 4")
-	putText(canvas, 1, 2, "[]  []  []   []  []   []  []   []")
-	putText(canvas, 1, 3, " |  |   |     |  |    |   |    |")
-	putSprite(canvas, trainX, 4, {
-		" ________________________ ",
-		"| [] [] [] [] [] [] []  |",
-		"|________________________|",
-		"  o  o  o  o  o  o  o   ",
-	})
 
 	return canvasLines(canvas)
 end
 
-local function sceneOcean(frame)
-	local canvas = makeCanvas(" ")
-	local sunX = 6 + math.floor((frame % 28) / 2)
+local function sceneDiagonalRain(frame)
+	return patternLines(frame, { "/", "/", ".", " ", "\\", "\\", ".", " " }, function(column, row, tick)
+		return column + row + tick
+	end)
+end
 
-	putText(canvas, sunX, 2, "\\ | /")
-	putText(canvas, sunX + 1, 3, "-O-")
-	putText(canvas, sunX, 4, "/ | \\")
+local function sceneCheckerPulse(frame)
+	return patternLines(frame, { "#", "#", "+", ".", " ", ".", "+", "#" }, function(column, row, tick)
+		return math.abs((column % 8) - (row % 8)) + tick
+	end)
+end
 
-	for y = 5, HEIGHT do
-		local wave = (frame + y) % 4
-		local line = string.sub("~~~~____~~~~____~~~~____~~~~____~~~~____", wave + 1, wave + WIDTH)
-		putText(canvas, 1, y, line)
+local function sceneDiamondTunnel(frame)
+	local centerColumn = math.floor(WIDTH / 2)
+	local centerRow = math.floor(HEIGHT / 2)
+
+	return patternLines(frame, { "#", "*", "+", "=", "-", ".", " " }, function(column, row, tick)
+		return math.abs(column - centerColumn) + math.abs(row - centerRow) + tick
+	end)
+end
+
+local function sceneBoxTunnel(frame)
+	local centerColumn = math.floor(WIDTH / 2)
+	local centerRow = math.floor(HEIGHT / 2)
+
+	return patternLines(frame, { "@", "#", "*", "+", ".", " " }, function(column, row, tick)
+		return math.max(math.abs(column - centerColumn), math.abs(row - centerRow)) + tick
+	end)
+end
+
+local function sceneVerticalScan(frame)
+	return patternLines(frame, { "|", "|", ":", ".", " ", ".", ":", "|" }, function(column, row, tick)
+		return math.abs(((column + tick) % 12) - 6) + row
+	end)
+end
+
+local function sceneHorizontalScan(frame)
+	return patternLines(frame, { "=", "=", "-", ".", " ", ".", "-", "=" }, function(column, row, tick)
+		return math.abs(((row * 3 + tick) % 14) - 7) + column
+	end)
+end
+
+local function sceneStaticStorm(frame)
+	return patternLines(frame, { "#", "*", "+", ".", " ", " ", ".", "+" }, function(column, row, tick)
+		return column * 17 + row * 31 + tick * 13 + column * row
+	end)
+end
+
+local function sceneFallingCode(frame)
+	return patternLines(frame, { "|", ":", ".", " ", " ", ".", ":" }, function(column, row, tick)
+		return column * 5 + row * 9 + math.floor((tick + column * 3) / 2)
+	end)
+end
+
+local function sceneVortex(frame)
+	local centerColumn = math.floor(WIDTH / 2)
+	local centerRow = math.floor(HEIGHT / 2)
+
+	return patternLines(frame, { "@", "#", "O", "o", ".", " ", ".", "o" }, function(column, row, tick)
+		local dx = math.abs(column - centerColumn)
+		local dy = math.abs(row - centerRow) * 4
+		return dx * dx + dy + tick
+	end)
+end
+
+local function sceneZigZag(frame)
+	return patternLines(frame, { "/", "/", "-", "_", "\\", "\\", "_", "-" }, function(column, row, tick)
+		return math.abs(((column + tick) % 16) - row * 2)
+	end)
+end
+
+local function sceneSparkField(frame)
+	return patternLines(frame, { "*", "+", ".", " ", " ", " ", ".", "+" }, function(column, row, tick)
+		return column * 7 + row * 11 + tick * tick + column * row
+	end)
+end
+
+local function sceneRipples(frame)
+	local centerColumn = 1 + (frame % WIDTH)
+	local centerRow = 1 + (math.floor(frame / 3) % HEIGHT)
+
+	return patternLines(frame, { "O", "o", ".", " ", ".", "o" }, function(column, row, tick)
+		return math.abs(column - centerColumn) + math.abs(row - centerRow) * 3 + tick
+	end)
+end
+
+local function sceneSineBands(frame)
+	return patternLines(frame, { "#", "=", "-", ".", " ", ".", "-", "=" }, function(column, row, tick)
+		return math.abs(((column + tick) % 18) - row * 2)
+	end)
+end
+
+local function sceneCrosshatch(frame)
+	return patternLines(frame, { "X", "/", "\\", "+", ".", " " }, function(column, row, tick)
+		return math.abs(((column + tick) % 10) - ((row * 2) % 10)) + math.abs(((column - tick) % 10) - row)
+	end)
+end
+
+local function sceneCurtain(frame)
+	return patternLines(frame, { "#", "#", "=", "-", ".", " ", ".", "-", "=" }, function(column, row, tick)
+		return math.abs(((column + tick) % WIDTH) - WIDTH / 2) + row * 2
+	end)
+end
+
+local function sceneBlinds(frame)
+	return patternLines(frame, { "#", "#", "#", "=", "-", ".", " " }, function(column, row, tick)
+		return math.abs(((row + tick) % HEIGHT) - HEIGHT / 2) + column
+	end)
+end
+
+local function sceneComets(frame)
+	local canvas = makeCanvas(".")
+
+	for index = 1, 9 do
+		local column = ((frame * 2 + index * 13) % (WIDTH + 12)) - 6
+		local row = ((index * 5 + frame) % HEIGHT) + 1
+		putSprite(canvas, column, row, { "***---..." })
 	end
 
-	putText(canvas, 2, 1, "SUNSET LOOP // DISPLAY BOARD TV")
 	return canvasLines(canvas)
 end
 
-local function sceneLoading(frame)
-	local canvas = makeCanvas(" ")
-	local barWidth = WIDTH - 8
-	local progress = frame % (barWidth + 1)
+local function sceneLattice(frame)
+	return patternLines(frame, { "+", "+", "-", "|", ".", " " }, function(column, row, tick)
+		if (column + tick) % 6 == 0 or (row * 2 + tick) % 6 == 0 then
+			return 0
+		end
 
-	putText(canvas, 7, 2, "GOOGLE-ISH LOADING")
-	putText(canvas, 4, 4, "+" .. string.rep("-", barWidth) .. "+")
-	putText(canvas, 4, 5, "|" .. string.rep("#", progress) .. string.rep(" ", barWidth - progress) .. "|")
-	putText(canvas, 4, 6, "+" .. string.rep("-", barWidth) .. "+")
-	putText(canvas, 9, 8, "PLEASE WAIT " .. string.sub("....", 1, (frame % 4) + 1))
+		return column + row + tick
+	end)
+end
+
+local function sceneBubbles(frame)
+	local canvas = makeCanvas(" ")
+
+	for index = 1, 18 do
+		local column = ((index * 11 + frame) % WIDTH) + 1
+		local row = HEIGHT - ((frame + index * 3) % HEIGHT)
+		local bubble = (index + frame) % 3 == 0 and "O" or "o"
+		setChar(canvas, column, row, bubble)
+	end
+
+	for row = HEIGHT - 1, HEIGHT do
+		for column = 1, WIDTH do
+			setChar(canvas, column, row, (column + frame) % 3 == 0 and "~" or ".")
+		end
+	end
+
 	return canvasLines(canvas)
+end
+
+local function sceneMaze(frame)
+	return patternLines(frame, { "#", "#", " ", " ", ".", "+" }, function(column, row, tick)
+		return math.floor((column + tick) / 4) + math.floor((row * 3 + tick) / 4) + column * row
+	end)
 end
 
 local scenes = {
-	sceneDino,
-	sceneMoonLanding,
-	sceneCityTrain,
-	sceneOcean,
-	sceneLoading,
+	sceneDiagonalRain,
+	sceneCheckerPulse,
+	sceneDiamondTunnel,
+	sceneBoxTunnel,
+	sceneVerticalScan,
+	sceneHorizontalScan,
+	sceneStaticStorm,
+	sceneFallingCode,
+	sceneVortex,
+	sceneZigZag,
+	sceneSparkField,
+	sceneRipples,
+	sceneSineBands,
+	sceneCrosshatch,
+	sceneCurtain,
+	sceneBlinds,
+	sceneComets,
+	sceneLattice,
+	sceneBubbles,
+	sceneMaze,
 }
 
 print("Running display patterns on " .. WIDTH .. "x" .. HEIGHT .. " board...")
