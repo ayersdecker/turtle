@@ -3,6 +3,8 @@ local BOARD_BLOCK_WIDTH = 9
 local BOARD_BLOCK_HEIGHT = 4
 local WIDTH = math.floor((BOARD_BLOCK_WIDTH * 16 - 2) / 3.5)
 local HEIGHT = BOARD_BLOCK_HEIGHT * 2
+local PATTERN_HEIGHT = HEIGHT - 1
+local FOOTER_TEXT = "visit www.deckerayers.com"
 local FRAME_SECONDS = 0.18
 
 local function attachedPeripherals()
@@ -90,9 +92,11 @@ end
 local function draw(lines)
 	clearDisplay()
 
-	for y = 1, HEIGHT do
+	for y = 1, PATTERN_HEIGHT do
 		writeLine(y, lines[y] or "")
 	end
+
+	writeLine(HEIGHT, FOOTER_TEXT)
 
 	flushDisplay()
 end
@@ -151,7 +155,7 @@ end
 local function patternLines(frame, palette, pattern)
 	local canvas = makeCanvas(" ")
 
-	for row = 1, HEIGHT do
+	for row = 1, PATTERN_HEIGHT do
 		for column = 1, WIDTH do
 			local value = pattern(column, row, frame)
 			setChar(canvas, column, row, palette[(value % #palette) + 1])
@@ -161,131 +165,133 @@ local function patternLines(frame, palette, pattern)
 	return canvasLines(canvas)
 end
 
-local function sceneDiagonalRain(frame)
-	return patternLines(frame, { "/", "/", ".", " ", "\\", "\\", ".", " " }, function(column, row, tick)
-		return column + row + tick
+local function sceneSlashes(frame)
+	return patternLines(frame, { "/", "/", " ", "\\", "\\", " " }, function(column, row, tick)
+		return math.floor((column + row * 2 + tick) / 2)
 	end)
 end
 
-local function sceneCheckerPulse(frame)
-	return patternLines(frame, { "#", "#", "+", ".", " ", ".", "+", "#" }, function(column, row, tick)
-		return math.abs((column % 8) - (row % 8)) + tick
+local function sceneBlocks(frame)
+	return patternLines(frame, { "#", "#", " ", " ", "+", "." }, function(column, row, tick)
+		return math.floor((column + tick) / 4) + math.floor(row / 2)
 	end)
 end
 
-local function sceneDiamondTunnel(frame)
+local function sceneDiamonds(frame)
 	local centerColumn = math.floor(WIDTH / 2)
-	local centerRow = math.floor(HEIGHT / 2)
+	local centerRow = math.floor(PATTERN_HEIGHT / 2) + 1
 
-	return patternLines(frame, { "#", "*", "+", "=", "-", ".", " " }, function(column, row, tick)
-		return math.abs(column - centerColumn) + math.abs(row - centerRow) + tick
+	return patternLines(frame, { "#", "*", "+", ".", " ", ".", "+", "*" }, function(column, row, tick)
+		return math.abs(column - centerColumn) + math.abs((row - centerRow) * 3) + tick
 	end)
 end
 
-local function sceneBoxTunnel(frame)
+local function sceneRings(frame)
 	local centerColumn = math.floor(WIDTH / 2)
-	local centerRow = math.floor(HEIGHT / 2)
+	local centerRow = math.floor(PATTERN_HEIGHT / 2) + 1
 
-	return patternLines(frame, { "@", "#", "*", "+", ".", " " }, function(column, row, tick)
-		return math.max(math.abs(column - centerColumn), math.abs(row - centerRow)) + tick
+	return patternLines(frame, { "@", "O", "o", ".", " ", ".", "o", "O" }, function(column, row, tick)
+		local dx = math.abs(column - centerColumn)
+		local dy = math.abs(row - centerRow) * 4
+		return math.floor((dx * dx + dy * dy) / 9) + tick
 	end)
 end
 
-local function sceneVerticalScan(frame)
-	return patternLines(frame, { "|", "|", ":", ".", " ", ".", ":", "|" }, function(column, row, tick)
-		return math.abs(((column + tick) % 12) - 6) + row
+local function sceneColumns(frame)
+	return patternLines(frame, { "|", "|", ":", ".", " ", ".", ":" }, function(column, row, tick)
+		return math.abs(((column + tick) % 10) - 5) + row
 	end)
 end
 
-local function sceneHorizontalScan(frame)
-	return patternLines(frame, { "=", "=", "-", ".", " ", ".", "-", "=" }, function(column, row, tick)
-		return math.abs(((row * 3 + tick) % 14) - 7) + column
+local function sceneRows(frame)
+	return patternLines(frame, { "=", "=", "-", ".", " ", ".", "-" }, function(column, row, tick)
+		return math.abs(((row * 3 + tick) % 12) - 6) + math.floor(column / 6)
 	end)
 end
 
-local function sceneStaticStorm(frame)
+local function sceneStatic(frame)
 	return patternLines(frame, { "#", "*", "+", ".", " ", " ", ".", "+" }, function(column, row, tick)
-		return column * 17 + row * 31 + tick * 13 + column * row
+		return column * 23 + row * 41 + tick * 17 + column * row
 	end)
 end
 
-local function sceneFallingCode(frame)
-	return patternLines(frame, { "|", ":", ".", " ", " ", ".", ":" }, function(column, row, tick)
-		return column * 5 + row * 9 + math.floor((tick + column * 3) / 2)
+local function sceneDrips(frame)
+	return patternLines(frame, { "|", ":", ".", " ", " ", " " }, function(column, row, tick)
+		return column * 7 + math.floor((row * 5 + tick + column) / 2)
 	end)
 end
 
 local function sceneVortex(frame)
 	local centerColumn = math.floor(WIDTH / 2)
-	local centerRow = math.floor(HEIGHT / 2)
+	local centerRow = math.floor(PATTERN_HEIGHT / 2) + 1
 
-	return patternLines(frame, { "@", "#", "O", "o", ".", " ", ".", "o" }, function(column, row, tick)
-		local dx = math.abs(column - centerColumn)
-		local dy = math.abs(row - centerRow) * 4
-		return dx * dx + dy + tick
+	return patternLines(frame, { "@", "#", "*", "+", ".", " ", ".", "+" }, function(column, row, tick)
+		local dx = column - centerColumn
+		local dy = (row - centerRow) * 5
+		return math.abs(dx * dy) + math.abs(dx) + tick
 	end)
 end
 
-local function sceneZigZag(frame)
-	return patternLines(frame, { "/", "/", "-", "_", "\\", "\\", "_", "-" }, function(column, row, tick)
+local function sceneZigZags(frame)
+	return patternLines(frame, { "/", "-", "_", "\\", "_", "-" }, function(column, row, tick)
 		return math.abs(((column + tick) % 16) - row * 2)
 	end)
 end
 
-local function sceneSparkField(frame)
-	return patternLines(frame, { "*", "+", ".", " ", " ", " ", ".", "+" }, function(column, row, tick)
-		return column * 7 + row * 11 + tick * tick + column * row
+local function sceneStars(frame)
+	return patternLines(frame, { "*", "+", ".", " ", " ", " ", " " }, function(column, row, tick)
+		return column * 13 + row * 29 + tick * tick + column * row
 	end)
 end
 
 local function sceneRipples(frame)
 	local centerColumn = 1 + (frame % WIDTH)
-	local centerRow = 1 + (math.floor(frame / 3) % HEIGHT)
+	local centerRow = 1 + (math.floor(frame / 4) % PATTERN_HEIGHT)
 
 	return patternLines(frame, { "O", "o", ".", " ", ".", "o" }, function(column, row, tick)
 		return math.abs(column - centerColumn) + math.abs(row - centerRow) * 3 + tick
 	end)
 end
 
-local function sceneSineBands(frame)
-	return patternLines(frame, { "#", "=", "-", ".", " ", ".", "-", "=" }, function(column, row, tick)
-		return math.abs(((column + tick) % 18) - row * 2)
+local function sceneChevrons(frame)
+	return patternLines(frame, { ">", ">", "-", " ", "<", "<", "-", " " }, function(column, row, tick)
+		return math.abs(((column + tick) % 12) - row)
 	end)
 end
 
 local function sceneCrosshatch(frame)
 	return patternLines(frame, { "X", "/", "\\", "+", ".", " " }, function(column, row, tick)
-		return math.abs(((column + tick) % 10) - ((row * 2) % 10)) + math.abs(((column - tick) % 10) - row)
+		return math.abs(((column + tick) % 9) - ((row * 2) % 9)) + math.abs(((column - tick) % 11) - row)
 	end)
 end
 
 local function sceneCurtain(frame)
-	return patternLines(frame, { "#", "#", "=", "-", ".", " ", ".", "-", "=" }, function(column, row, tick)
+	return patternLines(frame, { "#", "=", "-", ".", " ", ".", "-", "=" }, function(column, row, tick)
 		return math.abs(((column + tick) % WIDTH) - WIDTH / 2) + row * 2
 	end)
 end
 
-local function sceneBlinds(frame)
-	return patternLines(frame, { "#", "#", "#", "=", "-", ".", " " }, function(column, row, tick)
-		return math.abs(((row + tick) % HEIGHT) - HEIGHT / 2) + column
+local function sceneShutters(frame)
+	return patternLines(frame, { "#", "#", "=", "-", ".", " " }, function(column, row, tick)
+		return math.abs(((row * 2 + tick) % 14) - 7) + math.floor(column / 3)
 	end)
 end
 
 local function sceneComets(frame)
 	local canvas = makeCanvas(".")
 
-	for index = 1, 9 do
+	for index = 1, 10 do
 		local column = ((frame * 2 + index * 13) % (WIDTH + 12)) - 6
-		local row = ((index * 5 + frame) % HEIGHT) + 1
+		local row = ((index * 5 + frame) % PATTERN_HEIGHT) + 1
 		putSprite(canvas, column, row, { "***---..." })
 	end
 
 	return canvasLines(canvas)
 end
 
-local function sceneLattice(frame)
-	return patternLines(frame, { "+", "+", "-", "|", ".", " " }, function(column, row, tick)
-		if (column + tick) % 6 == 0 or (row * 2 + tick) % 6 == 0 then
+local function sceneGrid(frame)
+	return patternLines(frame, { "+", "-", "|", ".", " " }, function(column, row, tick)
+		if (column + tick) % 7 == 0 or (row * 2 + tick) % 6 == 0 then
 			return 0
 		end
 
@@ -296,14 +302,14 @@ end
 local function sceneBubbles(frame)
 	local canvas = makeCanvas(" ")
 
-	for index = 1, 18 do
+	for index = 1, 24 do
 		local column = ((index * 11 + frame) % WIDTH) + 1
-		local row = HEIGHT - ((frame + index * 3) % HEIGHT)
+		local row = PATTERN_HEIGHT - ((frame + index * 3) % PATTERN_HEIGHT)
 		local bubble = (index + frame) % 3 == 0 and "O" or "o"
 		setChar(canvas, column, row, bubble)
 	end
 
-	for row = HEIGHT - 1, HEIGHT do
+	for row = PATTERN_HEIGHT - 1, PATTERN_HEIGHT do
 		for column = 1, WIDTH do
 			setChar(canvas, column, row, (column + frame) % 3 == 0 and "~" or ".")
 		end
@@ -314,29 +320,29 @@ end
 
 local function sceneMaze(frame)
 	return patternLines(frame, { "#", "#", " ", " ", ".", "+" }, function(column, row, tick)
-		return math.floor((column + tick) / 4) + math.floor((row * 3 + tick) / 4) + column * row
+		return math.floor((column + tick) / 4) + math.floor((row * 3 + tick) / 3) + column * row
 	end)
 end
 
 local scenes = {
-	sceneDiagonalRain,
-	sceneCheckerPulse,
-	sceneDiamondTunnel,
-	sceneBoxTunnel,
-	sceneVerticalScan,
-	sceneHorizontalScan,
-	sceneStaticStorm,
-	sceneFallingCode,
+	sceneSlashes,
+	sceneBlocks,
+	sceneDiamonds,
+	sceneRings,
+	sceneColumns,
+	sceneRows,
+	sceneStatic,
+	sceneDrips,
 	sceneVortex,
-	sceneZigZag,
-	sceneSparkField,
+	sceneZigZags,
+	sceneStars,
 	sceneRipples,
-	sceneSineBands,
+	sceneChevrons,
 	sceneCrosshatch,
 	sceneCurtain,
-	sceneBlinds,
+	sceneShutters,
 	sceneComets,
-	sceneLattice,
+	sceneGrid,
 	sceneBubbles,
 	sceneMaze,
 }
