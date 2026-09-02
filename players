@@ -1,0 +1,139 @@
+local DISPLAY_SIDE = "top"
+local WIDTH = 40
+local HEIGHT = 8
+local REFRESH_SECONDS = 5
+
+local function attachedPeripherals()
+	local attached = {}
+
+	for _, name in ipairs(peripheral.getNames()) do
+		attached[#attached + 1] = name .. " (" .. peripheral.getType(name) .. ")"
+	end
+
+	return table.concat(attached, ", ")
+end
+
+local display = peripheral.wrap(DISPLAY_SIDE)
+
+if not display then
+	error("No display found on " .. DISPLAY_SIDE .. ". Attached peripherals: " .. attachedPeripherals())
+end
+
+local function hasMethod(name)
+	return type(display[name]) == "function"
+end
+
+local function fit(text)
+	text = tostring(text or "")
+	if #text > WIDTH then
+		return string.sub(text, 1, WIDTH)
+	end
+	return text .. string.rep(" ", WIDTH - #text)
+end
+
+local function writeLine(line, text)
+	text = fit(text)
+
+	if hasMethod("setCursorPos") and hasMethod("clearLine") and hasMethod("write") then
+		display.setCursorPos(1, line)
+		display.clearLine()
+		display.write(text)
+	elseif hasMethod("setLine") then
+		display.setLine(line, text)
+	elseif hasMethod("write") then
+		display.write(text .. "\n")
+	else
+		error("Display has no supported write method")
+	end
+end
+
+local function draw(lines)
+	if hasMethod("clear") then
+		display.clear()
+	end
+
+	for line = 1, HEIGHT do
+		writeLine(line, lines[line] or "")
+	end
+
+	if hasMethod("update") then
+		display.update()
+	elseif hasMethod("push") then
+		display.push()
+	end
+end
+
+local function centered(text)
+	local left = math.max(0, math.floor((WIDTH - #text) / 2))
+	return string.rep(" ", left) .. text
+end
+
+local function commandOutput(name, field)
+	local ok, success, output = pcall(commands.exec, "data", "get", "entity", name, field)
+	if not ok or not success or type(output) ~= "table" then
+		return nil
+	end
+
+	return table.concat(output, " ")
+end
+
+local function playerDetails(name)
+	local position = commandOutput(name, "Pos")
+	local health = commandOutput(name, "Health")
+	local dimension = commandOutput(name, "Dimension")
+
+	if not position then
+		return "details unavailable"
+	end
+
+	local x, y, z = position:match("(-?[%d%.]+)d?,%s*(-?[%d%.]+)d?,%s*(-?[%d%.]+)d?")
+	local healthValue = health and health:match("(-?[%d%.]+)")
+	local dimensionName = dimension and dimension:match("([%w_:]+)%s*$")
+
+	if not x or not y or not z then
+		return "details unavailable"
+	end
+
+	local location = string.format("%s %s,%s,%s", dimensionName or "world", x, y, z)
+	local status = healthValue and ("HP:" .. healthValue) or "HP:?"
+	return location .. " " .. status
+end
+
+local function playerLines()
+	local ok, players = pcall(commands.getPlayers)
+	if not ok then
+		return {
+			centered("SERVER PLAYERS"),
+			"",
+			"Command API unavailable.",
+			"Attach this computer to a",
+			"command-capable server.",
+		}
+	end
+
+	table.sort(players)
+	local lines = {
+		centered("SERVER PLAYERS"),
+		string.format("Online: %d", #players),
+	}
+
+	if #players == 0 then
+		lines[3] = "No players online"
+	else
+		for index, name in ipairs(players) do
+			if index > HEIGHT - 3 then
+				lines[HEIGHT - 1] = string.format("+ %d more", #players - index + 1)
+				break
+			end
+			lines[index + 2] = name .. " " .. playerDetails(name)
+		end
+	end
+
+	lines[HEIGHT] = "Updated every " .. REFRESH_SECONDS .. "s"
+	return lines
+end
+
+while true do
+	draw(playerLines())
+	sleep(REFRESH_SECONDS)
+end

@@ -1,0 +1,120 @@
+local DISPLAY_SIDE = "top"
+local WIDTH = 40
+local HEIGHT = 8
+local PAGE_SECONDS = 8
+
+local function attachedPeripherals()
+	local attached = {}
+
+	for _, name in ipairs(peripheral.getNames()) do
+		attached[#attached + 1] = name .. " (" .. peripheral.getType(name) .. ")"
+	end
+
+	return table.concat(attached, ", ")
+end
+
+local display = peripheral.wrap(DISPLAY_SIDE)
+
+if not display then
+	error("No display found on " .. DISPLAY_SIDE .. ". Attached peripherals: " .. attachedPeripherals())
+end
+
+local function hasMethod(name)
+	return type(display[name]) == "function"
+end
+
+local function fit(text)
+	text = tostring(text or "")
+	if #text > WIDTH then
+		return string.sub(text, 1, WIDTH)
+	end
+	return text .. string.rep(" ", WIDTH - #text)
+end
+
+local function writeLine(line, text)
+	text = fit(text)
+
+	if hasMethod("setCursorPos") and hasMethod("clearLine") and hasMethod("write") then
+		display.setCursorPos(1, line)
+		display.clearLine()
+		display.write(text)
+	elseif hasMethod("setLine") then
+		display.setLine(line, text)
+	elseif hasMethod("write") then
+		display.write(text .. "\n")
+	else
+		error("Display has no supported write method")
+	end
+end
+
+local function draw(lines)
+	if hasMethod("clear") then
+		display.clear()
+	end
+
+	for line = 1, HEIGHT do
+		writeLine(line, lines[line] or "")
+	end
+
+	if hasMethod("update") then
+		display.update()
+	elseif hasMethod("push") then
+		display.push()
+	end
+end
+
+local function centered(text)
+	local left = math.max(0, math.floor((WIDTH - #text) / 2))
+	return string.rep(" ", left) .. text
+end
+
+local pages = {
+	{
+		centered("DECKER AYERS"),
+		centered("Mobile Application Developer"),
+		"",
+		"Building useful, accessible tech.",
+		"Father of 3 | Problem solver",
+		"",
+		"deckerayers.com",
+		"",
+	},
+	{
+		centered("TOOLS OF THE TRADE"),
+		"",
+		"React       TypeScript",
+		"Flutter     Firebase",
+		"Unity       Python",
+		"Node.js     Swift",
+		"",
+		"deckerayers.com/#about",
+	},
+	{
+		centered("PROJECTS"),
+		"",
+		"RankKit       Cards",
+		"Prepared For Anything",
+		"Gameplan      Loficus",
+		"Solve.AI     WaterReady",
+		"",
+		"github.com/ayersdecker",
+	},
+	{
+		centered("FIND DECKER"),
+		"",
+		"Web  deckerayers.com",
+		"GitHub  github.com/ayersdecker",
+		"LinkedIn  /in/decker-ayers-807626196",
+		"",
+		"Accessibility | Inclusion | Purpose",
+		"",
+	},
+}
+
+local page = 1
+
+while true do
+	draw(pages[page])
+	page = (page % #pages) + 1
+	sleep(PAGE_SECONDS)
+end
