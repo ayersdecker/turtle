@@ -3,6 +3,7 @@ local WIDTH = 40
 local HEIGHT = 8
 local REFRESH_SECONDS = 1
 local SEASON_LENGTH = 28
+local EST_OFFSET_SECONDS = -5 * 60 * 60
 
 local SEASONS = { "Spring", "Summer", "Autumn", "Winter" }
 local MOON_PHASES = {
@@ -70,6 +71,29 @@ local function draw(lines)
 	end
 end
 
+local function splitLine(left, right)
+	local available = WIDTH - #right - 1
+	left = string.sub(left, 1, math.max(0, available))
+	return left .. string.rep(" ", WIDTH - #left - #right) .. right
+end
+
+local function realWorldTime()
+	if type(os.epoch) ~= "function" or type(os.date) ~= "function" then
+		return "EST unavailable", ""
+	end
+
+	local ok, time, date = pcall(function()
+		local timestamp = math.floor(os.epoch("utc") / 1000) + EST_OFFSET_SECONDS
+		return os.date("!%H:%M:%S", timestamp), os.date("!%Y-%m-%d", timestamp)
+	end)
+
+	if not ok then
+		return "EST unavailable", ""
+	end
+
+	return "EST " .. time, date
+end
+
 local function locate()
 	if type(gps) ~= "table" or type(gps.locate) ~= "function" then
 		return "GPS unavailable"
@@ -86,13 +110,14 @@ end
 local function statusLines()
 	local day = os.day()
 	local time = os.time()
+	local realTime, realDate = realWorldTime()
 	local seasonIndex = (math.floor(day / SEASON_LENGTH) % #SEASONS) + 1
 	local moonIndex = (day % #MOON_PHASES) + 1
 	local label = os.getComputerLabel() or "Unlabelled"
 
 	return {
-		"SERVER STATUS  " .. string.format("Day %d", day),
-		"Time " .. textutils.formatTime(time, true) .. "  " .. SEASONS[seasonIndex],
+		splitLine("SERVER STATUS  " .. string.format("Day %d", day), realTime),
+		splitLine("Time " .. textutils.formatTime(time, true) .. "  " .. SEASONS[seasonIndex], realDate),
 		"Moon: " .. MOON_PHASES[moonIndex],
 		locate(),
 		"Computer #" .. os.getComputerID() .. "  " .. label,
